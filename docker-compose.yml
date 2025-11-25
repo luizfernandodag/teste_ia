@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: summarization_service:latest
+    env_file:
+      - .env
+    environment:
+      - SUMMARIZATION_STRATEGY=${SUMMARIZATION_STRATEGY:-local}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CHUNK_SIZE=${CHUNK_SIZE:-800}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app:cached
+      # monta o PDF enviado para referência/documentação dentro do container
+      - /mnt/data/dc024419-8911-4ed3-b6f0-c0d129243904_Teste_Tecnico__IA__Python_(Entrega_em_3_dias_via_Git).pdf:/app/docs/teste_tecnico.pdf:ro
+    depends_on:
+      - redis
+    restart: unless-stopped
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+
+  mcp_server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mcp_server:latest
+    env_file:
+      - .env
+    volumes:
+      - ./:/app:cached
+    depends_on:
+      - web
+    command: ["python", "-u", "mcp_server/server.py"]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  redis-data:
